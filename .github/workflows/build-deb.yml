@@ -1,0 +1,60 @@
+name: Build Debian Package
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Required for setuptools_scm to detect history/tags
+
+    - name: Install Build Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          devscripts \
+          debhelper \
+          dh-python \
+          python3-all \
+          python3-setuptools \
+          python3-setuptools-scm \
+          python3-wheel \
+          python3-pip \
+          python3-yaml \
+          python3-cherrypy3 \
+          python3-paho-mqtt \
+          python3-psutil \
+          python3-jwt \
+          build-essential \
+          fakeroot
+
+    - name: Build Package (Development)
+      if: "!startsWith(github.ref, 'refs/tags/')"
+      run: |
+        chmod +x scripts/build-dev.sh
+        chmod +x debian/rules
+        ./scripts/build-dev.sh
+
+    - name: Build Package (Production)
+      if: "startsWith(github.ref, 'refs/tags/')"
+      run: |
+        chmod +x scripts/build-prod.sh
+        chmod +x debian/rules
+        ./scripts/build-prod.sh
+
+    - name: Upload Debian Package
+      uses: actions/upload-artifact@v4
+      with:
+        name: debian-package
+        path: "*.deb"
+        if-no-files-found: error
