@@ -2,7 +2,7 @@ name: Build Debian Package
 
 on:
   push:
-    branches: [ "main", "master", "develop" ]
+    branches: [ "main", "master", "develop", "dev" ]
     tags: [ "v*" ]
   pull_request:
     branches: [ "main", "master" ]
@@ -37,6 +37,11 @@ jobs:
           python3-jwt \
           build-essential \
           fakeroot
+
+    - name: Debug File System
+      run: |
+        ls -la
+        ls -la scripts/ || true
 
     - name: Build Package (Development)
       if: "!startsWith(github.ref, 'refs/tags/')"
