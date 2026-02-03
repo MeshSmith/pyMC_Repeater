@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+# Where SDM cloned the repo
+SRC_DIR="/home/meshsmith"
+
+# Where you want the installed runtime files to live
 INSTALL_DIR="/opt/pymc_repeater"
 CONFIG_DIR="/etc/pymc_repeater"
 LOG_DIR="/var/log/pymc_repeater"
@@ -11,15 +15,14 @@ SERVICE_NAME="pymc-repeater"
 
 echo "[pymc] starting install..."
 
-# Must be root (SDM phase runs as root)
 if [ "${EUID:-0}" -ne 0 ]; then
   echo "[pymc] ERROR: must run as root"
   exit 1
 fi
 
-# Repo must already exist (git-clone puts it here)
-if [ ! -f "$INSTALL_DIR/pyproject.toml" ]; then
-  echo "[pymc] ERROR: $INSTALL_DIR/pyproject.toml not found (did you clone the repo?)"
+# Validate source checkout (not INSTALL_DIR)
+if [ ! -f "$SRC_DIR/pyproject.toml" ]; then
+  echo "[pymc] ERROR: $SRC_DIR/pyproject.toml not found (is the repo cloned to $SRC_DIR?)"
   exit 1
 fi
 
@@ -41,7 +44,6 @@ apt-get install -y --no-install-recommends \
   git ca-certificates \
   libffi-dev jq python3-pip python3-rrdtool wget swig build-essential python3-dev
 
-# setuptools_scm is needed because project uses setuptools_scm for versioning
 python3 -m pip install --break-system-packages -q setuptools_scm || true
 
 echo "[pymc] installing mikefarah/yq v4 (only if missing/wrong)..."
@@ -58,30 +60,38 @@ if ! command -v yq >/dev/null 2>&1 || ! (yq --version 2>&1 | grep -q "mikefarah/
 fi
 
 echo "[pymc] generating _version.py (best-effort)..."
-# This only works if .git exists. If SDM cloned depth-1, it should.
-if [ -d "$INSTALL_DIR/.git" ]; then
-  (cd "$INSTALL_DIR" && git fetch --tags 2>/dev/null) || true
-  (cd "$INSTALL_DIR" && python3 -c "from setuptools_scm import get_version; get_version(write_to='repeater/_version.py')" ) || true
+if [ -d "$SRC_DIR/.git" ]; then
+  (cd "$SRC_DIR" && git fetch --tags 2>/dev/null) || true
+  (cd "$SRC_DIR" && python3 -c "from setuptools_scm import get_version; get_version(write_to='repeater/_version.py')" ) || true
 fi
 
-echo "[pymc] installing runtime files..."
-# Ensure manage/service/example files exist before copying
-if [ -f "$INSTALL_DIR/pymc-repeater.service" ]; then
-  cp "$INSTALL_DIR/pymc-repeater.service" /etc/systemd/system/
+echo "[pymc] installing runtime files into $INSTALL_DIR..."
+# Clean old runtime payload (optional but keeps things sane)
+rm -rf "$INSTALL_DIR/repeater" 2>/dev/null || true
+
+# Copy the project runtime bits
+cp -r "$SRC_DIR/repeater" "$INSTALL_DIR/"
+cp "$SRC_DIR/pyproject.toml" "$INSTALL_DIR/"
+[ -f "$SRC_DIR/README.md" ] && cp "$SRC_DIR/README.md" "$INSTALL_DIR/" || true
+[ -f "$SRC_DIR/manage.sh" ] && cp "$SRC_DIR/manage.sh" "$INSTALL_DIR/" || true
+
+# Service + defaults
+if [ -f "$SRC_DIR/pymc-repeater.service" ]; then
+  cp "$SRC_DIR/pymc-repeater.service" "$INSTALL_DIR/"
+  cp "$SRC_DIR/pymc-repeater.service" /etc/systemd/system/
 fi
 
-if [ -f "$INSTALL_DIR/config.yaml.example" ]; then
-  cp "$INSTALL_DIR/config.yaml.example" "$CONFIG_DIR/config.yaml.example"
+if [ -f "$SRC_DIR/config.yaml.example" ]; then
+  cp "$SRC_DIR/config.yaml.example" "$CONFIG_DIR/config.yaml.example"
   if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
     cp "$CONFIG_DIR/config.yaml.example" "$CONFIG_DIR/config.yaml"
   fi
 fi
 
-# Optional JSON defaults
-[ -f "$INSTALL_DIR/radio-settings.json" ] && cp "$INSTALL_DIR/radio-settings.json" "$DATA_DIR/" || true
-[ -f "$INSTALL_DIR/radio-presets.json"  ] && cp "$INSTALL_DIR/radio-presets.json"  "$DATA_DIR/" || true
+[ -f "$SRC_DIR/radio-settings.json" ] && cp "$SRC_DIR/radio-settings.json" "$DATA_DIR/" || true
+[ -f "$SRC_DIR/radio-presets.json"  ] && cp "$SRC_DIR/radio-presets.json"  "$DATA_DIR/" || true
 
-echo "[pymc] configuring polkit rule (passwordless restart for repeater user)..."
+echo "[pymc] configuring polkit rule..."
 mkdir -p /etc/polkit-1/rules.d
 cat > /etc/polkit-1/rules.d/10-pymc-repeater.rules <<'EOF'
 polkit.addRule(function(action, subject) {
@@ -101,21 +111,19 @@ chmod 755 "$DATA_DIR" || true
 mkdir -p "$DATA_DIR/.config/pymc_repeater"
 chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR/.config"
 
-echo "[pymc] installing python package..."
+echo "[pymc] installing python package (from source at $SRC_DIR)..."
 export PIP_ROOT_USER_ACTION=ignore
 export PIP_ONLY_BINARY=pycryptodome,cffi,PyNaCl,psutil
-
-# Set a safe pretend version; if git metadata exists, let setuptools_scm compute it.
 export SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0+sdm"
 
-cd "$INSTALL_DIR"
+cd "$SRC_DIR"
 python3 -m pip install --break-system-packages --force-reinstall --no-cache-dir .
 
 echo "[pymc] enabling service..."
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 
-# In SDM image build, starting may fail (no real boot), so don't hard-fail.
+# Starting during image build can fail; don’t hard fail
 systemctl start "$SERVICE_NAME" 2>/dev/null || true
 
 echo "[pymc] install complete."
