@@ -1,8 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Where SDM cloned the repo
-SRC_DIR="/home/meshsmith/pyMC_Repeater"
+# Determine script directory and repo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Where you want the installed runtime files to live
 INSTALL_DIR="/opt/pymc_repeater"
@@ -14,6 +15,7 @@ SERVICE_USER="repeater"
 SERVICE_NAME="pymc-repeater"
 
 echo "[pymc] starting install..."
+echo "[pymc] Source directory determined as: $SRC_DIR"
 
 if [ "${EUID:-0}" -ne 0 ]; then
   echo "[pymc] ERROR: must run as root"
@@ -118,6 +120,13 @@ export SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0+sdm"
 
 cd "$SRC_DIR"
 python3 -m pip install --break-system-packages --force-reinstall --no-cache-dir .
+
+# Verify pymc_core installation
+if python3 -c "import pymc_core; print(f'pymc_core version: {pymc_core.__version__}')" 2>/dev/null; then
+    echo "[pymc] ✓ pymc_core installed successfully"
+else
+    echo "[pymc] ⚠ pymc_core import failed - check installation logs"
+fi
 
 echo "[pymc] enabling service..."
 systemctl daemon-reload
