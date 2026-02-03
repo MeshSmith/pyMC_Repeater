@@ -119,7 +119,7 @@ export PIP_ONLY_BINARY=pycryptodome,cffi,PyNaCl,psutil
 export SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0+sdm"
 
 cd "$SRC_DIR"
-python3 -m pip install --break-system-packages --force-reinstall --no-cache-dir .
+python3 -m pip install --break-system-packages --no-cache-dir .
 
 # Verify pymc_core installation
 if python3 -c "import pymc_core; print(f'pymc_core version: {pymc_core.__version__}')" 2>/dev/null; then
