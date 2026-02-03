@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Where SDM cloned the repo
-SRC_DIR="/home/meshsmith"
+SRC_DIR="/home/meshsmith/pyMC_Repeater"
 
 # Where you want the installed runtime files to live
 INSTALL_DIR="/opt/pymc_repeater"
