@@ -121,6 +121,11 @@ export SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0+sdm"
 cd "$SRC_DIR"
 python3 -m pip install --break-system-packages --no-cache-dir .
 
+#Patch for display missing libs
+python3 -m pip install luma.oled --break-system-packages
+python3 -m pip install pillow --break-system-packages
+
+
 # Verify pymc_core installation
 if python3 -c "import pymc_core; print(f'pymc_core version: {pymc_core.__version__}')" 2>/dev/null; then
     echo "[pymc] ✓ pymc_core installed successfully"
