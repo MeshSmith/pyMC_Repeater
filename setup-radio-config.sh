@@ -286,6 +286,33 @@ else
     fi
 fi
 
+# Check for display configuration
+if ! grep -q "^display:" "$CONFIG_FILE"; then
+    echo "Adding default display configuration..."
+    cat <<EOF >> "$CONFIG_FILE"
+
+# Display configuration (OLED screens)
+display:
+  # Enable/disable display output
+  enabled: true
+  
+  # Display type: ssd1327 (128x128 grayscale), ssd1306 (128x64 monochrome)
+  type: "ssd1327"
+  
+  # I2C configuration
+  i2c_port: 1        # I2C bus number (usually 1 on Raspberry Pi)
+  i2c_address: 0x3D  # I2C address (0x3D for SSD1327, 0x3C for SSD1306)
+  
+  # Display settings
+  contrast: 255      # Display contrast (0-255, only for SSD1327)
+  rotation: 1        # Screen rotation 0-3 (0, 90, 180, 270)
+  
+  # Update interval in seconds (0.5 = 2 fps for smooth animation)
+  update_interval: 0.5
+EOF
+fi
+
+
 # Cleanup
 rm -f /tmp/radio_*_* "$CONFIG_FILE.bak"
 
