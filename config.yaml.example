@@ -305,7 +305,7 @@ logging:
 # Display configuration (OLED screens)
 display:
   # Enable/disable display output
-  enabled: false
+  enabled: true
   
   # Display type: ssd1327 (128x128 grayscale), ssd1306 (128x64 monochrome)
   type: "ssd1327"
@@ -316,6 +316,7 @@ display:
   
   # Display settings
   contrast: 255      # Display contrast (0-255, only for SSD1327)
+  rotation: 1 # Screen rotation 0-3 (0, 90, 180, 270)
   
   # Update interval in seconds (0.5 = 2 fps for smooth animation)
   update_interval: 0.5
